@@ -1,27 +1,38 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QPushButton
-from PyQt5.QtCore import QPropertyAnimation, QRect
+from PyQt5.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout
+from PyQt5.QtCore import QPropertyAnimation, Qt
+from PyQt5.QtWidgets import QGraphicsOpacityEffect
 
-class SimpleAnimation(QWidget):
+class FadeInDemo(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PyQt5 Animation Demo")
-        self.resize(400, 200)
+        self.setWindowTitle("Fade-In Animation Demo")
+        self.setGeometry(100, 100, 400, 200)
 
-        # Button to animate
-        self.button = QPushButton("Click Me", self)
-        self.button.setGeometry(20, 80, 100, 40)
-        self.button.clicked.connect(self.start_animation)
+        # Create a label
+        self.label = QLabel("Hello, Fade In!", self)
+        self.label.setAlignment(Qt.AlignCenter)
+        self.label.setStyleSheet("font-size: 24px;")
 
-    def start_animation(self):
-        # Create an animation object targeting the button's geometry
-        self.anim = QPropertyAnimation(self.button, b"geometry")
-        self.anim.setDuration(2000)  # duration in ms
-        self.anim.setStartValue(QRect(20, 80, 100, 40))
-        self.anim.setEndValue(QRect(300, 150, 100, 40))
-        self.anim.start()
+        # Apply opacity effect
+        self.opacity_effect = QGraphicsOpacityEffect()
+        self.label.setGraphicsEffect(self.opacity_effect)
+        self.opacity_effect.setOpacity(0)  # start fully transparent
 
-app = QApplication(sys.argv)
-window = SimpleAnimation()
-window.show()
-sys.exit(app.exec_())
+        # Layout
+        layout = QVBoxLayout()
+        layout.addWidget(self.label)
+        self.setLayout(layout)
+
+        # Create animation
+        self.animation = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.animation.setDuration(2000)  # 2 seconds
+        self.animation.setStartValue(0)
+        self.animation.setEndValue(1)
+        self.animation.start()  # start animation
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = FadeInDemo()
+    window.show()
+    sys.exit(app.exec_())
