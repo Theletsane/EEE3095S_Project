@@ -63,7 +63,7 @@ class TextBorderAnimator(QObject):
 class PanelColorAnimator(QObject):
     def __init__(self, panel):
         super().__init__()
-        self._color = QColor("#F0E68C")
+        self._color = QColor("#AFDDCE")
         self.panel = panel
 
     def getColor(self):
@@ -397,11 +397,11 @@ class HomePage(QWidget):
         self.text_border_animator = TextBorderAnimator(self.button)
         border_anim = QPropertyAnimation(self.text_border_animator, b"color")
         border_anim.setDuration(8000)
-        border_anim.setKeyValueAt(0.0, QColor("#800080"))
+        border_anim.setKeyValueAt(0.0, QColor("#864086"))
         border_anim.setKeyValueAt(0.25, QColor("#DEB7EE"))
         border_anim.setKeyValueAt(0.5, QColor("#7497C4"))
         border_anim.setKeyValueAt(0.75, QColor("#70C6C5"))
-        border_anim.setKeyValueAt(1.0, QColor("#800080"))
+        border_anim.setKeyValueAt(1.0, QColor("#864086"))
         border_anim.setLoopCount(-1)
         border_anim.start()
         self.text_border_animation = border_anim
@@ -417,7 +417,7 @@ class HomePage(QWidget):
 
         self.panel = QWidget(self)
         self.panel.resize(panel_w, panel_h)
-        self.panel.setStyleSheet("background-color: #F0E68C; border-radius: 15px;")
+        self.panel.setStyleSheet("background-color: #70C6C5; border-radius: 15px;")
 
         # Label inside panel
         self.panel_label = QLabel("Connect Dongle", self.panel)
