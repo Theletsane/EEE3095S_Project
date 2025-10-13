@@ -77,7 +77,7 @@ class PanelColorAnimator(QObject):
 class HomePage(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Button Drop + Panel Animation")
+        self.setWindowTitle("Button & Panel Color Animation")
         self.resize(1000, 850)
         self.setStyleSheet("background-color: white;")
 
@@ -132,6 +132,7 @@ class HomePage(QWidget):
         self.fade_animation = anim
 
     def start_color_fade(self):
+        # Button color looping
         anim = QPropertyAnimation(self.color_animator, b"color")
         anim.setDuration(4000)
         anim.setKeyValueAt(0.0, QColor("#EBE8EB"))
@@ -139,9 +140,12 @@ class HomePage(QWidget):
         anim.setKeyValueAt(0.5, QColor("#7497C4"))
         anim.setKeyValueAt(0.75, QColor("#70C6C5"))
         anim.setKeyValueAt(1.0, QColor("#4A706F"))
-        anim.finished.connect(self.drop_button)
+        anim.setLoopCount(-1)  # loop indefinitely
         anim.start()
         self.color_animation = anim
+
+        # Drop button after first fade
+        QTimer.singleShot(4000, self.drop_button)
 
     def drop_button(self):
         w,h = self.width(), self.height()
@@ -158,14 +162,9 @@ class HomePage(QWidget):
         self.drop_animation = anim
 
     def on_button_dropped(self):
-        # Glow and text-border animation
+        # Glow effect
         self.button.setText("Connect")
         self.button.setEnabled(True)
-        w = self.width()
-        h = self.height()
-        btn_w = int(w * 0.3)
-        btn_h = int(h * 0.1)
-        self.button.resize(btn_w, btn_h)
         self.button.setGraphicsEffect(self.glow_effect)
         glow_anim = QPropertyAnimation(self.glow_effect, b"strength")
         glow_anim.setDuration(2500)
@@ -174,7 +173,7 @@ class HomePage(QWidget):
         glow_anim.start()
         self.glow_animation = glow_anim
 
-        # Looping text+border color
+        # Text+border color animation
         self.text_border_animator = TextBorderAnimator(self.button)
         border_anim = QPropertyAnimation(self.text_border_animator, b"color")
         border_anim.setDuration(8000)
@@ -222,16 +221,21 @@ class HomePage(QWidget):
         anim.setStartValue(QPoint(start_x, -panel_h))
         anim.setEndValue(QPoint(start_x, start_y))
         anim.setEasingCurve(QEasingCurve.OutBounce)
-        anim.finished.connect(self.animate_panel_color)
+        anim.finished.connect(self.start_panel_color_loop)
         anim.start()
         self.panel_drop_animation = anim
 
-    def animate_panel_color(self):
+    def start_panel_color_loop(self):
+        # Panel color animation loop matches the button
         self.panel_color_animator = PanelColorAnimator(self.panel)
         anim = QPropertyAnimation(self.panel_color_animator, b"color")
-        anim.setDuration(2000)
-        anim.setStartValue(QColor("#F0E68C"))
-        anim.setEndValue(QColor("#C0C0C0"))  # Silver
+        anim.setDuration(4000)
+        anim.setKeyValueAt(0.0, QColor("#EBE8EB"))
+        anim.setKeyValueAt(0.25, QColor("#DEB7EE"))
+        anim.setKeyValueAt(0.5, QColor("#7497C4"))
+        anim.setKeyValueAt(0.75, QColor("#70C6C5"))
+        anim.setKeyValueAt(1.0, QColor("#4A706F"))
+        anim.setLoopCount(-1)
         anim.start()
         self.panel_color_animation = anim
 

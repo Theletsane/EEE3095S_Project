@@ -201,7 +201,7 @@ class HomePage(QWidget):
         self.panel.setStyleSheet("background-color: #F0E68C; border-radius: 15px;")
 
         # Label inside panel
-        self.panel_label = QLabel("Hello! I am a panel", self.panel)
+        self.panel_label = QLabel("Connect Dongle", self.panel)
         self.panel_label.setStyleSheet("""
             color: white;
             font-size: 24px;
@@ -222,16 +222,21 @@ class HomePage(QWidget):
         anim.setStartValue(QPoint(start_x, -panel_h))
         anim.setEndValue(QPoint(start_x, start_y))
         anim.setEasingCurve(QEasingCurve.OutBounce)
-        anim.finished.connect(self.animate_panel_color)
+        anim.finished.connect(self.start_panel_color_loop)
         anim.start()
         self.panel_drop_animation = anim
 
-    def animate_panel_color(self):
+    def start_panel_color_loop(self):
+        # Panel color animation loop matches the button
         self.panel_color_animator = PanelColorAnimator(self.panel)
         anim = QPropertyAnimation(self.panel_color_animator, b"color")
-        anim.setDuration(2000)
-        anim.setStartValue(QColor("#F0E68C"))
-        anim.setEndValue(QColor("#C0C0C0"))  # Silver
+        anim.setDuration(7000)
+        anim.setKeyValueAt(0.0, QColor("#EBE8EB"))
+        anim.setKeyValueAt(0.25, QColor("#DEB7EE"))
+        anim.setKeyValueAt(0.5, QColor("#7497C4"))
+        anim.setKeyValueAt(0.75, QColor("#70C6C5"))
+        anim.setKeyValueAt(1.0, QColor("#4A706F"))
+        anim.setLoopCount(-1)
         anim.start()
         self.panel_color_animation = anim
 
