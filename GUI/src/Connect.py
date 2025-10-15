@@ -1,532 +1,285 @@
-import sys
+# Connect.py
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QPushButton, QLabel, QGraphicsOpacityEffect,
-    QGraphicsColorizeEffect, QGraphicsView, QGraphicsScene,
-    QGraphicsRectItem, QGraphicsEllipseItem, QGraphicsTextItem, QVBoxLayout
+    QWidget, QPushButton, QTextEdit, QLabel, QVBoxLayout, QHBoxLayout,
+    QGraphicsOpacityEffect, QApplication
 )
-from PyQt5.QtCore import (
-    QPropertyAnimation, QEasingCurve, QPoint, QTimer, pyqtProperty,
-    QObject, QPointF, Qt
-)
-from PyQt5.QtGui import QColor, QBrush, QPen, QFont, QPainter
+from PyQt5.QtCore import Qt, QPropertyAnimation, QEasingCurve, QRect, QTimer
+from PyQt5.QtGui import QClipboard, QPainter, QColor, QTransform
 
-# ------------------------- Button Animators -------------------------
-class ColorAnimator(QObject):
-    def __init__(self, button):
-        super().__init__()
-        self._color = QColor("#EBE8EB")
-        self.button = button
-
-    def getColor(self):
-        return self._color
-
-    def setColor(self, color):
-        self._color = color
-        self.button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {color.name()};
-                color: white;
-                border: none;
-                border-radius: 12px;
-                font-size: 20px;
-                padding: 10px 20px;
-            }}
-        """)
-
-    color = pyqtProperty(QColor, fget=getColor, fset=setColor)
-
-class TextBorderAnimator(QObject):
-    def __init__(self, button):
-        super().__init__()
-        self._color = QColor("#800080")
-        self.button = button
-
-    def getColor(self):
-        return self._color
-
-    def setColor(self, color):
-        self._color = color
-        self.button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: transparent;
-                color: {color.name()};
-                border: 3px solid {color.name()};
-                border-radius: 14px;
-                font-size: 24px;
-                font-weight: bold;
-                padding: 10px 20px;
-            }}
-        """)
-
-    color = pyqtProperty(QColor, fget=getColor, fset=setColor)
-
-class PanelColorAnimator(QObject):
-    def __init__(self, panel):
-        super().__init__()
-        self._color = QColor("#AFDDCE")
-        self.panel = panel
-
-    def getColor(self):
-        return self._color
-
-    def setColor(self, color):
-        self._color = color
-        self.panel.setStyleSheet(f"background-color: {color.name()}; border-radius: 15px;")
-
-    color = pyqtProperty(QColor, fget=getColor, fset=setColor)
-
-# ------------------------- USB Animators -------------------------
-class AnimatedUSB(QObject):
-    def __init__(self, graphics_item):
-        super().__init__()
-        self.graphics_item = graphics_item
-        self._pos_x = graphics_item.x()
-        
-    def get_pos_x(self):
-        return self._pos_x
-    
-    def set_pos_x(self, x):
-        self._pos_x = x
-        self.graphics_item.setX(x)
-    
-    pos_x = pyqtProperty(float, get_pos_x, set_pos_x)
-
-class AnimatedItem(QObject):
-    def __init__(self, graphics_item):
-        super().__init__()
-        self.graphics_item = graphics_item
-        self._pos = graphics_item.pos()
-        
-    def get_pos(self):
-        return self._pos
-    
-    def set_pos(self, pos):
-        self._pos = pos
-        self.graphics_item.setPos(pos)
-    
-    pos = pyqtProperty(QPointF, get_pos, set_pos)
-
-class AnimatedPosX(QObject):
-    def __init__(self, graphics_item):
-        super().__init__()
-        self.graphics_item = graphics_item
-        self._pos_x = graphics_item.x()
-        self._pos_y = graphics_item.y()
-        
-    def get_pos_x(self):
-        return self._pos_x
-    
-    def set_pos_x(self, x):
-        self._pos_x = x
-        self.graphics_item.setPos(x, self._pos_y)
-    
-    pos_x = pyqtProperty(float, get_pos_x, set_pos_x)
-
-# ------------------------- Connection Failed Widget -------------------------
-class ConnectionFailedWidget(QWidget):
-    def __init__(self, parent=None, return_callback=None):
+# --------------------- Snackbar ---------------------
+class Snackbar(QLabel):
+    """Snackbar notification that fades in/out."""
+    def __init__(self, parent=None):
         super().__init__(parent)
-        self.return_callback = return_callback
-        self.init_ui()
-        
-    def init_ui(self):
-        self.setStyleSheet("background-color: transparent;")
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        self.setStyleSheet("""
+            QLabel {
+                background-color: rgba(50, 50, 50, 180);
+                color: white;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+        """)
+        self.setAlignment(Qt.AlignCenter)
+        self.setVisible(False)
+        self.effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.effect)
+        self.anim = QPropertyAnimation(self.effect, b"opacity", self)
+        self.anim.setDuration(400)
+        self.anim.setEasingCurve(QEasingCurve.InOutQuad)
 
-        # Labels
-        self.title_label = QLabel("Device Not Found!")
-        self.title_label.setAlignment(Qt.AlignCenter)
-        self.title_label.setStyleSheet("color: #ff6b6b; font-size: 28px; font-weight: bold;")
-        layout.addWidget(self.title_label)
+    def show_message(self, text):
+        self.setText(text)
+        self.setVisible(True)
+        self.raise_()
+        self.anim.stop()
+        self.anim.setStartValue(0)
+        self.anim.setEndValue(1)
+        self.anim.start()
+        QTimer.singleShot(2000, self.fade_out)
 
-        self.instruction_label = QLabel("Please connect your STM board to the PC")
-        self.instruction_label.setAlignment(Qt.AlignCenter)
-        self.instruction_label.setStyleSheet("color: #4A706F; font-size: 16px;")
-        layout.addWidget(self.instruction_label)
+    def fade_out(self):
+        self.anim.stop()
+        self.anim.setStartValue(1)
+        self.anim.setEndValue(0)
+        self.anim.start()
+        self.anim.finished.connect(lambda: self.setVisible(False))
 
-        # USB Animation
-        self.animation_container = QWidget()
-        self.animation_container.setFixedHeight(150)
-        layout.addWidget(self.animation_container)
-        self.scene = QGraphicsScene()
-        self.scene.setSceneRect(0, 0, 300, 120)
-        self.view = QGraphicsView(self.scene, self.animation_container)
-        self.view.setRenderHint(QPainter.Antialiasing)
-        self.view.setStyleSheet("border:none; background:transparent;")
-        self.view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.view.setGeometry(0, 0, 300, 150)
+# --------------------- Paper Tab ---------------------
+class PaperTab(QLabel):
+    """Paper tab under the button, expands on hover, tilted."""
+    def __init__(self, parent, button, textbox, snackbar):
+        super().__init__(parent)
+        self.button = button
+        self.textbox = textbox
+        self.snackbar = snackbar
+        self.stick_offset = 5
+        self.default_height = int(button.height() * 0.55)
+        self.expanded_height = int(button.height() * 0.8)
+        self.anim = None
 
-        self.setup_usb_animation()
-
-        # Countdown
-        self.countdown_label = QLabel("Returning in 15 seconds...")
-        self.countdown_label.setAlignment(Qt.AlignCenter)
-        self.countdown_label.setStyleSheet("color: #8892b0; font-size: 14px;")
-        layout.addWidget(self.countdown_label)
-
-        self.hint_label = QLabel("💡 Check USB cable connection and try again")
-        self.hint_label.setAlignment(Qt.AlignCenter)
-        self.hint_label.setStyleSheet("color: #70C6C5; font-size: 13px; font-style: italic;")
-        layout.addWidget(self.hint_label)
-
-        self.opacity_effect = QGraphicsOpacityEffect()
-        self.setGraphicsEffect(self.opacity_effect)
-        self.opacity_effect.setOpacity(0)
-
-        self.countdown_seconds = 15
-        self.countdown_timer = QTimer()
-        self.countdown_timer.timeout.connect(self.update_countdown)
-
-    def setup_usb_animation(self):
-        # Port
-        self.port = QGraphicsRectItem(220, 45, 60, 30)
-        self.port.setBrush(QBrush(QColor(45, 55, 72)))
-        self.scene.addItem(self.port)
-        port_slot = QGraphicsRectItem(228, 52, 44, 16)
-        port_slot.setBrush(QBrush(Qt.black))
-        self.scene.addItem(port_slot)
-
-        # Cable
-        self.cable_item = QGraphicsRectItem(0, 57, 70, 6)
-        self.cable_item.setBrush(QBrush(QColor(100,100,100)))
-        self.scene.addItem(self.cable_item)
-        self.cable = AnimatedPosX(self.cable_item)
-
-        # Connector
-        self.connector_item = QGraphicsRectItem(0, 0, 40, 20)
-        self.connector_item.setBrush(QBrush(QColor(200,200,200)))
-        self.connector_item.setPen(QPen(QColor(150, 150, 150), 2))
-        self.connector_item.setPos(20, 50)
-        self.scene.addItem(self.connector_item)
-        self.connector = AnimatedUSB(self.connector_item)
-
-        # USB Symbol
-        self.usb_symbol_item = self.scene.addText("⚡")
-        self.usb_symbol_item.setFont(QFont("Arial", 12, QFont.Bold))
-        self.usb_symbol_item.setDefaultTextColor(QColor(80, 80, 80))
-        self.usb_symbol_item.setPos(28,48)
-        self.usb_symbol = AnimatedItem(self.usb_symbol_item)
-
-        # Arrow
-        arrow = self.scene.addText("→")
-        arrow.setPos(140, 40)
-        arrow.setDefaultTextColor(QColor(255, 107, 107))
-        arrow.setFont(QFont("Arial", 40, QFont.Bold))
-
-    def show_animation(self):
-        fade_in = QPropertyAnimation(self.opacity_effect, b"opacity")
-        fade_in.setDuration(500)
-        fade_in.setStartValue(0)
-        fade_in.setEndValue(1)
-        fade_in.start()
-        self.fade_in_anim = fade_in
-
-        QTimer.singleShot(300, self.start_usb_loop)
-        self.countdown_timer.start(1000)
-
-    def start_usb_loop(self):
-        self.animations = []
-
-        # Connector animation
-        conn_anim = QPropertyAnimation(self.connector, b"pos_x")
-        conn_anim.setDuration(2000)
-        conn_anim.setStartValue(20)
-        conn_anim.setEndValue(180)
-        conn_anim.setEasingCurve(QEasingCurve.InOutQuad)
-        conn_anim.setLoopCount(-1)
-        conn_anim.start()
-        self.animations.append(conn_anim)
-
-        # Cable animation
-        cable_anim = QPropertyAnimation(self.cable, b"pos_x")
-        cable_anim.setDuration(2000)
-        cable_anim.setStartValue(-50)
-        cable_anim.setEndValue(110)
-        cable_anim.setEasingCurve(QEasingCurve.InOutQuad)
-        cable_anim.setLoopCount(-1)
-        cable_anim.start()
-        self.animations.append(cable_anim)
-
-        # USB symbol animation
-        symbol_anim = QPropertyAnimation(self.usb_symbol, b"pos")
-        symbol_anim.setDuration(2000)
-        symbol_anim.setStartValue(QPointF(28,48))
-        symbol_anim.setEndValue(QPointF(188,48))
-        symbol_anim.setEasingCurve(QEasingCurve.InOutQuad)
-        symbol_anim.setLoopCount(-1)
-        symbol_anim.start()
-        self.animations.append(symbol_anim)
-
-    def update_countdown(self):
-        self.countdown_seconds -= 1
-        if self.countdown_seconds>0:
-            self.countdown_label.setText(f"Returning in {self.countdown_seconds} seconds...")
-        else:
-            self.countdown_label.setText("Returning now...")
-            self.countdown_timer.stop()
-            QTimer.singleShot(500, self.hide_and_return)
-
-    def hide_and_return(self):
-        fade_out = QPropertyAnimation(self.opacity_effect, b"opacity")
-        fade_out.setDuration(500)
-        fade_out.setStartValue(1)
-        fade_out.setEndValue(0)
-        fade_out.finished.connect(self.on_fade_out_complete)
-        fade_out.start()
-        self.fade_out_anim = fade_out
-
-    def on_fade_out_complete(self):
+        self.setStyleSheet("""
+            background-color: #87A19E;
+            border: 1px solid #FAFAF0;
+            border-radius: 3px;
+        """)
+        self.setFixedHeight(self.default_height)
         self.hide()
-        if self.return_callback:
-            self.return_callback()
 
-# ------------------------- Home Page -------------------------
-class HomePage(QWidget):
-    def __init__(self):
+    def enterEvent(self, event):
+        self.animate_height(self.expanded_height)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.animate_height(self.default_height)
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        text_content = self.textbox.toPlainText().strip()
+        if text_content:
+            QApplication.clipboard().setText(text_content)
+            self.snackbar.show_message("Code in clipboard")
+        super().mousePressEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        transform = QTransform()
+        transform.shear(0.05, 0)
+        painter.setTransform(transform)
+        painter.fillRect(self.rect(), QColor("#87A19E"))
+        painter.setPen(Qt.NoPen)
+        painter.drawRect(self.rect())
+
+    def animate_height(self, target_height):
+        anim = QPropertyAnimation(self, b"geometry")
+        anim.setDuration(250)
+        anim.setEasingCurve(QEasingCurve.InOutCubic)
+
+        rect = self.geometry()
+        btn_pos = self.button.mapTo(self.parent(), self.button.rect().topLeft())
+        btn_w = self.button.width()
+        new_y = btn_pos.y() - target_height + self.stick_offset
+        new_h = target_height
+        new_x = btn_pos.x() + int(btn_w * 0.1)
+        new_w = int(btn_w * 0.8)
+
+        anim.setStartValue(rect)
+        anim.setEndValue(QRect(new_x, new_y, new_w, new_h))
+        anim.start()
+        self.anim = anim
+
+    def update_position(self):
+        btn_pos = self.button.mapTo(self.parent(), self.button.rect().topLeft())
+        btn_w = self.button.width()
+        tab_w = int(btn_w * 0.8)
+        tab_x = btn_pos.x() + int(btn_w * 0.1)
+        tab_y = btn_pos.y() - self.height() + self.stick_offset
+        self.setGeometry(tab_x, tab_y, tab_w, self.height())
+
+# --------------------- SlideBox ---------------------
+class SlideBox(QWidget):
+    def __init__(self, label, snackbar):
         super().__init__()
-        self.setWindowTitle("Dongle Lock - Welcome")
-        self.resize(1000, 850)
-        self.setStyleSheet("background-color: white;")
+        self.visible = False
 
-        # --- Welcome Button ---
-        self.button = QPushButton("Welcome", self)
-        self.button.setEnabled(False)
+        self.button = QPushButton(label)
+        self.button.setFixedSize(200, 50)
         self.button.setStyleSheet("""
             QPushButton {
-                background-color: #EBE8EB;
+                background-color: #0F2021;
                 color: white;
-                border: none;
-                border-radius: 12px;
-                font-size: 25px;
-                padding: 10px 20px;
+                font-size: 16px;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #243037;
             }
         """)
 
-        # Effects
-        self.opacity_effect = QGraphicsOpacityEffect()
-        self.button.setGraphicsEffect(self.opacity_effect)
-        self.opacity_effect.setOpacity(0)
+        self.textbox = QTextEdit()
+        self.textbox.setStyleSheet("""
+            background-color: #87A19E;
+            font-size: 14px;
+            border-radius: 5px;
+        """)
+        self.textbox.setFixedHeight(50)
+        self.textbox.setFixedWidth(0)
+        self.textbox.hide()
 
-        self.color_animator = ColorAnimator(self.button)
-        self.glow_effect = QGraphicsColorizeEffect()
-        self.glow_effect.setColor(QColor(128,0,128))
-        self.glow_effect.setStrength(0)
+        self.paper_tab = PaperTab(self, self.button, self.textbox, snackbar)
 
-        # Place button
-        self.update_button()
+        container = QWidget()
+        container.setFixedHeight(60)
+        hbox_container = QHBoxLayout(container)
+        hbox_container.setContentsMargins(0,0,0,0)
+        hbox_container.setSpacing(20)
+        hbox_container.addWidget(self.button, alignment=Qt.AlignCenter)
+        hbox_container.addWidget(self.textbox, alignment=Qt.AlignLeft)
 
-        # Failed widget placeholder
-        self.failed_widget = None
-        self.panel = None
+        main_layout = QVBoxLayout(self)
+        main_layout.addWidget(container)
+        main_layout.setContentsMargins(0,0,0,0)
+        main_layout.setSpacing(0)
 
-        # Start animation sequence
-        QTimer.singleShot(500, self.start_fade_in)
+        self.button.clicked.connect(self.toggle_textbox)
 
     def resizeEvent(self, event):
-        self.update_button()
+        self.paper_tab.update_position()
         super().resizeEvent(event)
 
-    def update_button(self):
-        w, h = self.width(), self.height()
-        btn_w, btn_h = int(w*0.3), int(h*0.2)
-        self.button.resize(btn_w, btn_h)
-        self.button.move((w-btn_w)//2, int(h*0.25))
+    def toggle_textbox(self):
+        self.textbox.show()
+        anim = QPropertyAnimation(self.textbox, b"maximumWidth")
+        anim.setDuration(500)
+        anim.setEasingCurve(QEasingCurve.InOutCubic)
 
-    # --- Welcome Animation Sequence ---
-    def start_fade_in(self):
-        anim = QPropertyAnimation(self.opacity_effect, b"opacity")
-        anim.setDuration(2000)
-        anim.setStartValue(0)
-        anim.setEndValue(1)
-        anim.finished.connect(self.start_color_fade)
-        anim.start()
-        self.fade_animation = anim
-
-    def start_color_fade(self):
-        anim = QPropertyAnimation(self.color_animator, b"color")
-        anim.setDuration(4000)
-        anim.setKeyValueAt(0.0, QColor("#EBE8EB"))
-        anim.setKeyValueAt(0.25, QColor("#DEB7EE"))
-        anim.setKeyValueAt(0.5, QColor("#7497C4"))
-        anim.setKeyValueAt(0.75, QColor("#70C6C5"))
-        anim.setKeyValueAt(1.0, QColor("#4A706F"))
-        anim.finished.connect(self.drop_button)
-        anim.start()
-        self.color_animation = anim
-
-    def drop_button(self):
-        w,h = self.width(), self.height()
-        btn_w, btn_h = self.button.width(), self.button.height()
-        target_x = (w-btn_w)//2
-        target_y = int(h*0.8) - btn_h//2
-
-        anim = QPropertyAnimation(self.button, b"pos")
-        anim.setDuration(2400)
-        anim.setEndValue(QPoint(target_x, target_y))
-        anim.setEasingCurve(QEasingCurve.OutBounce)
-        anim.finished.connect(self.on_button_dropped)
-        anim.start()
-        self.drop_animation = anim
-
-    def on_button_dropped(self):
-        # Change to Connect button
-        self.button.setText("Connect")
-        self.button.setEnabled(True)
-        w = self.width()
-        h = self.height()
-        btn_w = int(w * 0.3)
-        btn_h = int(h * 0.1)
-        self.button.resize(btn_w, btn_h)
-        
-        # Connect click handler
-        self.button.clicked.connect(self.on_connect_clicked)
-        
-        # Glow effect
-        self.button.setGraphicsEffect(self.glow_effect)
-        glow_anim = QPropertyAnimation(self.glow_effect, b"strength")
-        glow_anim.setDuration(2500)
-        glow_anim.setStartValue(0)
-        glow_anim.setEndValue(1)
-        glow_anim.start()
-        self.glow_animation = glow_anim
-
-        # Looping text+border color
-        self.text_border_animator = TextBorderAnimator(self.button)
-        border_anim = QPropertyAnimation(self.text_border_animator, b"color")
-        border_anim.setDuration(8000)
-        border_anim.setKeyValueAt(0.0, QColor("#864086"))
-        border_anim.setKeyValueAt(0.25, QColor("#DEB7EE"))
-        border_anim.setKeyValueAt(0.5, QColor("#7497C4"))
-        border_anim.setKeyValueAt(0.75, QColor("#70C6C5"))
-        border_anim.setKeyValueAt(1.0, QColor("#864086"))
-        border_anim.setLoopCount(-1)
-        border_anim.start()
-        self.text_border_animation = border_anim
-
-        # Show panel
-        self.show_dropping_panel()
-
-    def show_dropping_panel(self):
-        w,h = self.width(), self.height()
-        panel_w, panel_h = int(w*0.6), int(h*0.2)
-        start_x = (w-panel_w)//2
-        start_y = int(h*0.25)
-
-        self.panel = QWidget(self)
-        self.panel.resize(panel_w, panel_h)
-        self.panel.setStyleSheet("background-color: #70C6C5; border-radius: 15px;")
-
-        # Label inside panel
-        self.panel_label = QLabel("Connect Dongle", self.panel)
-        self.panel_label.setStyleSheet("""
-            color: white;
-            font-size: 24px;
-            font-weight: bold;
-            background: transparent;
-        """)
-        self.panel_label.adjustSize()
-        self.panel_label.move((panel_w - self.panel_label.width())//2,
-                              (panel_h - self.panel_label.height())//2)
-
-        # Start above window
-        self.panel.move(start_x, -panel_h)
-        self.panel.show()
-
-        # Drop animation
-        anim = QPropertyAnimation(self.panel, b"pos")
-        anim.setDuration(1800)
-        anim.setStartValue(QPoint(start_x, -panel_h))
-        anim.setEndValue(QPoint(start_x, start_y))
-        anim.setEasingCurve(QEasingCurve.OutBounce)
-        anim.finished.connect(self.start_panel_color_loop)
-        anim.start()
-        self.panel_drop_animation = anim
-
-    def start_panel_color_loop(self):
-        # Panel color animation loop
-        self.panel_color_animator = PanelColorAnimator(self.panel)
-        anim = QPropertyAnimation(self.panel_color_animator, b"color")
-        anim.setDuration(7000)
-        anim.setKeyValueAt(0.0, QColor("#F0DCF3"))
-        anim.setKeyValueAt(0.25, QColor("#DEB7EE"))
-        anim.setKeyValueAt(0.5, QColor("#7497C4"))
-        anim.setKeyValueAt(0.75, QColor("#70C6C5"))
-        anim.setKeyValueAt(1.0, QColor("#4A706F"))
-        anim.setLoopCount(-1)
-        anim.start()
-        self.panel_color_animation = anim
-
-    # --- Connect Button Handler ---
-    def on_connect_clicked(self):
-        # Simulate connection attempt (replace with actual serial connection)
-        # For demo, always fails - change to actual connection logic
-        connection_success = False  # Change this based on real connection
-        
-        if connection_success:
-            self.show_connected_state()
+        if not self.visible:
+            self.paper_tab.hide()
+            anim.setStartValue(0)
+            anim.setEndValue(300)
         else:
-            self.show_connection_failed()
+            anim.setStartValue(300)
+            anim.setEndValue(0)
+            def after_close():
+                if self.textbox.toPlainText().strip():
+                    self.paper_tab.setFixedHeight(self.paper_tab.default_height)
+                    self.paper_tab.show()
+                    self.paper_tab.update_position()
+                else:
+                    self.paper_tab.hide()
+            anim.finished.connect(after_close)
 
-    def show_connected_state(self):
-        # TODO: Implement connected state
-        # Hide panel, show main interface
-        if self.panel:
-            self.panel.hide()
-        self.button.setText("Connected!")
-        print("Connection successful!")
+        anim.start()
+        self.anim = anim
+        self.visible = not self.visible
 
-    def show_connection_failed(self):
-        # Hide panel and button
-        if self.panel:
-            self.panel.hide()
-        self.button.hide()
+# --------------------- Connect Page ---------------------
+class ConnectPage(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Connect Page")
+        self.setFixedSize(1000, 850)
+        self.setStyleSheet("background-color: #E4EEF0;")
         
-        # Remove any existing failed widget
-        if self.failed_widget:
-            self.failed_widget.deleteLater()
-        
-        w, h = self.width(), self.height()
-        
-        # Make the widget fill more of the window (85% width, 80% height)
-        panel_w, panel_h = int(w * 0.85), int(h * 0.8)
-        x = (w - panel_w) // 2
-        y = (h - panel_h) // 2  # center vertically
-        
-        # Create the "Connection Failed" widget
-        self.failed_widget = ConnectionFailedWidget(
-            parent=self, 
-            return_callback=self.return_to_connect
-        )
-        self.failed_widget.setGeometry(x, y, panel_w, panel_h)
-        self.failed_widget.setStyleSheet("""
-            background-color: #F5F5F5;
-            border: 4px solid #ff6b6b;
-            border-radius: 27px;
-            padding: 30px;
+        self.home_page = None  # Reference to HomePage for back navigation
+        self.disconnect_page = None
+
+        self.snackbar = Snackbar(self)
+        self.snackbar.setFixedWidth(250)
+        self.snackbar.move((self.width() - 250)//2, self.height() - 100)
+
+        # SlideBoxes
+        self.box1 = SlideBox("Button 1", self.snackbar)
+        self.box2 = SlideBox("Button 2", self.snackbar)
+        self.box3 = SlideBox("Button 3", self.snackbar)
+
+        vbox = QVBoxLayout()
+        vbox.addStretch()
+        vbox.addWidget(self.box1)
+        vbox.addWidget(self.box2)
+        vbox.addWidget(self.box3)
+        vbox.addStretch()
+        vbox.setSpacing(40)
+        vbox.setAlignment(Qt.AlignCenter)
+        self.setLayout(vbox)
+
+        # Disconnect button (top-left) - goes back to HomePage
+        self.disconnect_btn = QPushButton("Disconnect", self)
+        self.disconnect_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF6B6B;
+                color: white;
+                font-size: 14px;
+                border-radius: 6px;
+                padding: 6px 12px;
+            }
+            QPushButton:hover { background-color: #FF4C4C; }
         """)
-        self.failed_widget.show()
-        self.failed_widget.show_animation()
+        self.disconnect_btn.adjustSize()
+        margin = 10
+        self.disconnect_btn.move(margin, margin)
+        self.disconnect_btn.clicked.connect(self.go_to_homepage)
 
+        # Disconnect and Exit button (top-right) - goes to DisconnectPage
+        self.exit_btn = QPushButton("Disconnect and Exit", self)
+        self.exit_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FF6B6B;
+                color: white;
+                font-size: 14px;
+                border-radius: 6px;
+                padding: 6px 12px;
+            }
+            QPushButton:hover { background-color: #FF4C4C; }
+        """)
+        self.exit_btn.adjustSize()
+        self.exit_btn.move(self.width() - self.exit_btn.width() - margin, margin)
+        self.exit_btn.clicked.connect(self.open_disconnect_page)
 
-    def return_to_connect(self):
-        # Show button and panel again
-        self.button.show()
-        if self.panel:
-            self.panel.show()
-            
-        # Clean up failed widget
-        if self.failed_widget:
-            self.failed_widget.deleteLater()
-            self.failed_widget = None
-            
-        print("Returned to connect screen.")
+    def go_to_homepage(self):
+        """Go back to HomePage (connection screen)"""
+        if self.home_page:
+            self.home_page.show()
+            self.close()
+        else:
+            # If no reference, create new HomePage
+            from HomePage import HomePage
+            home = HomePage()
+            home.show()
+            self.close()
 
-# ------------------------- Run -------------------------
+    def open_disconnect_page(self):
+        """Open DisconnectPage (exit sequence)"""
+        from Disconnect import DisconnectPage
+        self.disconnect_page = DisconnectPage()
+        self.disconnect_page.connect_page = self  # Pass reference
+        self.disconnect_page.show()
+        self.close()
+
+# Standalone run
 if __name__ == "__main__":
+    import sys
     app = QApplication(sys.argv)
-    window = HomePage()
+    window = ConnectPage()
     window.show()
     sys.exit(app.exec_())
